@@ -5,3 +5,5 @@ node_modules
 /public/build
 /public/uploads
 .env
+/netlify/functions/server/build
+/.netlify

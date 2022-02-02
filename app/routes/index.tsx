@@ -1,4 +1,3 @@
-import { UploadHandler } from '@remix-run/node/formData'
 import type { Readable } from 'stream'
 import {
   ActionFunction,
@@ -8,29 +7,12 @@ import {
   json,
 } from 'remix'
 
-export const action: ActionFunction = async ({ request }) => {
-  const handler: UploadHandler = async ({ stream }) => {
-    // convert stream to blob needed by FormData
-    const blob = await streamToBlob(stream)
-    const formData = new FormData()
-    formData.set('api_key', String(process.env.CLOUDINARY_API_KEY))
-    formData.set('upload_preset', 'default')
-    formData.set('file', blob)
-    const url = `https://api.cloudinary.com/v1_1/${process.env.CLOUDINARY_CLOUD_NAME}/image/upload`
-    const response = await fetch(url, {
-      method: 'POST',
-      body: formData,
-    })
-    // result is actually JSON, but must return as string
-    const result = await response.text()
-    return result
-  }
-
-  const formData = await unstable_parseMultipartFormData(request, handler)
-  // parse JSON returned from handler
-  const file = JSON.parse(String(formData.get('file')))
-  return json(file)
+export const action: ActionFunction = async ({ request, context }) => {
+  const formData = await context.parseMultipartFormData()
+  const result = await uploadCloudinary(formData.get('file'))
+  return json(result)
 }
+
 export default function Index() {
   const data = useActionData() ?? {}
   const { secure_url, bytes } = data
@@ -80,4 +62,20 @@ function streamToBlob(stream: Readable, mimeType?: string): Promise<Blob> {
       })
       .once('error', reject)
   })
+}
+
+async function uploadCloudinary(file: File): Promise<any> {
+  const formData = new FormData()
+  formData.set('api_key', String(process.env.CLOUDINARY_API_KEY))
+  formData.set('upload_preset', 'default')
+  formData.set('file', file)
+  const url = `https://api.cloudinary.com/v1_1/${process.env.CLOUDINARY_CLOUD_NAME}/image/upload`
+  const response = await fetch(url, {
+    method: 'POST',
+    body: formData,
+  })
+  if (response.ok) {
+    return response.json()
+  }
+  throw new Error(`${response.status} ${response.statusText}`)
 }
